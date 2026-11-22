@@ -36,6 +36,8 @@ class ParseResponse(BaseModel):
     like_count: Optional[int] = None
     upload_date: Optional[str] = None  # YYYY-MM-DD when available
     description: Optional[str] = None
+    # Soft hint e.g. image-note with music only (not a hard error)
+    notice: Optional[str] = None
     options: list[DownloadOption]
 
 

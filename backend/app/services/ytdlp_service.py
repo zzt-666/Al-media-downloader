@@ -4,9 +4,11 @@ import logging
 import re
 import shutil
 import subprocess
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import yt_dlp
 from yt_dlp.utils import DownloadError
@@ -16,6 +18,16 @@ from app.schemas import DownloadOption, MediaType, ParseResponse
 from app.services.douyin_patch import apply_douyin_patch
 
 VALID_MEDIA_TYPES: frozenset[str] = frozenset({"av", "video", "audio"})
+
+# Share short-links (v.douyin.com/xxxx) need HTTP redirect expand before yt-dlp.
+DOUYIN_SHORT_HOSTS = frozenset({"v.douyin.com"})
+# Synthetic AV for Douyin image/notes (images + music → MP4 via ffmpeg).
+NOTE_AV_FORMAT_ID = "__douyin_note_av__"
+_DOUYIN_REDIRECT_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +44,11 @@ class ServiceError(Exception):
         self.status_code = status_code
 
 
+def _is_douyin_family_host(host: str) -> bool:
+    host = (host or "").lower()
+    return "douyin.com" in host or "iesdouyin.com" in host
+
+
 def _douyin_video_id_from_url(parsed) -> Optional[str]:
     """Extract a concrete Douyin aweme/video id, or None for feed/home pages."""
     qs = parse_qs(parsed.query)
@@ -40,17 +57,58 @@ def _douyin_video_id_from_url(parsed) -> Optional[str]:
         return str(modal_id)
 
     path = parsed.path or ""
-    for pattern in (r"/video/(\d+)", r"/note/(\d+)", r"/share/video/(\d+)"):
+    for pattern in (
+        r"/video/(\d+)",
+        r"/note/(\d+)",
+        r"/share/video/(\d+)",
+        r"/share/note/(\d+)",
+    ):
         match = re.search(pattern, path)
         if match:
             return match.group(1)
     return None
 
 
+def _resolve_http_redirects(url: str, max_hops: int = 8) -> str:
+    """Follow Douyin share short-link redirects without downloading bodies."""
+
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+            return None
+
+    current = url
+    opener = urllib.request.build_opener(_NoRedirect)
+    headers = {
+        "User-Agent": _DOUYIN_REDIRECT_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+    for _ in range(max_hops):
+        req = urllib.request.Request(current, headers=headers, method="GET")
+        try:
+            with opener.open(req, timeout=15) as resp:
+                return resp.geturl() or current
+        except urllib.error.HTTPError as exc:
+            loc = exc.headers.get("Location") if exc.headers else None
+            if loc and exc.code in {301, 302, 303, 307, 308}:
+                current = urljoin(current, loc)
+                # Stop early once we already have a concrete aweme id.
+                if _douyin_video_id_from_url(urlparse(current)):
+                    return current
+                continue
+            return current
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Douyin redirect resolve failed url=%s err=%s", url, exc)
+            return current
+    return current
+
+
 def _is_douyin_non_video_page(parsed) -> bool:
     """Homepage / recommend / feed pages cannot be parsed as a single video."""
     host = (parsed.netloc or "").lower()
-    if "douyin.com" not in host:
+    if not _is_douyin_family_host(host):
+        return False
+    # Short share links are resolvable; do not reject them here.
+    if host in DOUYIN_SHORT_HOSTS:
         return False
     if _douyin_video_id_from_url(parsed):
         return False
@@ -72,23 +130,85 @@ def _is_douyin_non_video_page(parsed) -> bool:
 
 
 def normalize_media_url(url: str) -> str:
-    """Rewrite share/feed URLs into extractor-friendly canonical forms."""
-    parsed = urlparse(url.strip())
+    """Rewrite share/feed/short URLs into extractor-friendly canonical forms."""
+    raw = url.strip()
+    parsed = urlparse(raw)
     host = (parsed.netloc or "").lower()
-    if "douyin.com" not in host:
-        return url.strip()
+    if not _is_douyin_family_host(host):
+        return raw
 
     video_id = _douyin_video_id_from_url(parsed)
+    # v.douyin.com/xxxx → follow redirects → /note|/video|/share/...
+    if not video_id and host in DOUYIN_SHORT_HOSTS:
+        resolved = _resolve_http_redirects(raw)
+        if resolved != raw:
+            logger.info("Resolved Douyin short URL %s → %s", raw, resolved)
+        parsed = urlparse(resolved)
+        host = (parsed.netloc or "").lower()
+        if not _is_douyin_family_host(host):
+            return resolved
+        video_id = _douyin_video_id_from_url(parsed)
+        raw = resolved
+
     if video_id:
         return f"https://www.douyin.com/video/{video_id}"
 
-    return url.strip()
+    if host in DOUYIN_SHORT_HOSTS:
+        raise ServiceError(
+            "无法从抖音短链接解析出视频，请打开视频后复制含 /video/数字 的完整链接",
+            status_code=400,
+        )
+
+    return raw
 
 
-def validate_url(url: str) -> str:
+def _is_pure_http_url(value: str) -> bool:
+    """True when the whole string is already a single http(s) URL."""
+    parsed = urlparse(value)
+    return parsed.scheme.lower() in ALLOWED_URL_SCHEMES and bool(parsed.netloc)
+
+
+def _extract_http_url_from_text(text: str) -> Optional[str]:
+    """
+    Pull the first http(s) URL out of share-copy text (Douyin / Bilibili / etc.).
+
+    Only used when the full input is not already a pure URL, so existing
+    pure-link behavior is unchanged.
+    """
+    match = re.search(r"https?://[^\s<>\"']+", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    candidate = match.group(0).rstrip("，。；：、！？,.!?;:)]}＞》」』\"'")
+    # Guard against trailing junk glued by some share apps (e.g. …/xxx/DhB:/)
+    # Keep path segments that look like short-ids; strip only if clearly broken.
+    if not _is_pure_http_url(candidate):
+        return None
+    return candidate
+
+
+def coerce_media_url(url: str) -> str:
+    """
+    Accept either a pure http(s) URL or share text that contains one.
+
+    Priority:
+      1) whole input is already a pure URL
+      2) else extract the first http(s) URL from the text
+      3) else raise a Chinese validation error
+    """
     raw = (url or "").strip()
     if not raw:
         raise ServiceError("请输入有效的 http(s) 视频链接")
+    if _is_pure_http_url(raw):
+        return raw
+    extracted = _extract_http_url_from_text(raw)
+    if extracted:
+        logger.info("Extracted media URL from share text → %s", extracted)
+        return extracted
+    raise ServiceError("请输入有效的 http(s) 视频链接")
+
+
+def validate_url(url: str) -> str:
+    raw = coerce_media_url(url)
     parsed = urlparse(raw)
     if parsed.scheme.lower() not in ALLOWED_URL_SCHEMES or not parsed.netloc:
         raise ServiceError("请输入有效的 http(s) 视频链接")
@@ -290,13 +410,163 @@ def _collect_height_picks(
     return picks, video_only, audio_best
 
 
-def build_download_options(raw_formats: list[dict[str, Any]]) -> list[DownloadOption]:
+def _http_download_file(url: str, dest: Path, referer: str = "https://www.douyin.com/") -> None:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": _DOUYIN_REDIRECT_UA,
+            "Referer": referer,
+            "Accept": "*/*",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        dest.write_bytes(resp.read())
+    if not dest.is_file() or dest.stat().st_size <= 0:
+        raise ServiceError("图文素材下载失败，请稍后重试", status_code=502)
+
+
+def probe_douyin_note_bundle(aweme_id: str) -> Optional[dict[str, Any]]:
+    """
+    Detect Douyin image/note posts that have images + music but no real video stream.
+
+    Important: some notes expose play_addr as audio/mp4 while yt-dlp still labels it
+    as h264「Direct video」with a fake height. Trust images + empty bit_rate instead
+    of play_addr URI heuristics.
+    """
+    from yt_dlp.extractor.tiktok import DouyinIE
+
+    from app.services.douyin_patch import _check_and_get_required_cookies, _get_aweme_detail
+
+    aweme_id = str(aweme_id or "").strip()
+    if not aweme_id.isdigit():
+        return None
+
+    ydl = yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noprogress": True})
+    ie = DouyinIE(ydl)
+    try:
+        _check_and_get_required_cookies(ie)
+        detail = _get_aweme_detail(ie, aweme_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("probe Douyin note failed id=%s err=%s", aweme_id, exc)
+        return None
+    if not detail:
+        return None
+
+    video_info = detail.get("video") or {}
+    images = detail.get("images") or []
+    bit_rate = video_info.get("bit_rate") or []
+    # Real videos expose bitrate ladder; image notes have images and no bit_rate.
+    if not images or bit_rate:
+        return None
+
+    image_urls: list[str] = []
+    for im in images:
+        if not isinstance(im, dict):
+            continue
+        urls = im.get("download_url_list") or im.get("url_list") or []
+        if urls:
+            image_urls.append(str(urls[0]))
+
+    music = detail.get("music") or {}
+    play = music.get("play_url") or {}
+    audio_url = None
+    if isinstance(play, dict):
+        audio_url = (play.get("url_list") or [None])[0] or play.get("uri")
+    elif isinstance(play, str):
+        audio_url = play
+    # Newer notes often put AAC in video.play_addr (audio/mp4), not music.play_url.
+    if not audio_url:
+        pa = video_info.get("play_addr") or {}
+        if isinstance(pa, dict):
+            audio_url = (pa.get("url_list") or [None])[0] or pa.get("uri")
+
+    if not image_urls or not audio_url:
+        return None
+
+    duration = music.get("duration") or detail.get("duration") or 0
+    try:
+        duration_i = int(duration)
+    except (TypeError, ValueError):
+        duration_i = 0
+    if duration_i <= 0:
+        duration_i = 15
+
+    return {
+        "aweme_id": aweme_id,
+        "image_urls": image_urls,
+        "audio_url": str(audio_url),
+        "duration": duration_i,
+        "title": str(detail.get("desc") or aweme_id),
+    }
+
+
+def synthesize_douyin_note_av(bundle: dict[str, Any], out_path: Path) -> Path:
+    """Compose first image + music into a playable MP4 (still-image video)."""
+    if not ffmpeg_available():
+        raise ServiceError("下载该内容需要本机安装 ffmpeg", status_code=400)
+
+    work = out_path.parent / f"_note_work_{out_path.stem}"
+    if work.exists():
+        shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True, exist_ok=True)
+    try:
+        img_path = work / "cover.jpg"
+        audio_path = work / "audio.mp3"
+        _http_download_file(bundle["image_urls"][0], img_path)
+        _http_download_file(bundle["audio_url"], audio_path)
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-loop",
+            "1",
+            "-i",
+            str(img_path),
+            "-i",
+            str(audio_path),
+            "-c:v",
+            "libx264",
+            "-tune",
+            "stillimage",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-pix_fmt",
+            "yuv420p",
+            "-vf",
+            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            str(out_path),
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            logger.warning("note AV synth failed err=%s", exc)
+            raise ServiceError("图文合成视频失败，请稍后重试或选择仅音频", status_code=502) from exc
+        if not out_path.is_file() or out_path.stat().st_size <= 0:
+            raise ServiceError("图文合成视频失败，请稍后重试或选择仅音频", status_code=502)
+        return out_path
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def build_download_options(
+    raw_formats: list[dict[str, Any]],
+    *,
+    note_bundle: Optional[dict[str, Any]] = None,
+) -> list[DownloadOption]:
     """
     One flat list of cards — clarity + format already combined.
 
     - Skip watermarked junk (e.g. Douyin download_addr 405P oversized).
     - Pin concrete format_id so label size matches what we download.
     - Douyin often only has muxed A+V: 「仅视频/仅音频」still offered, stripped/extracted later.
+    - Douyin image/notes: offer synthetic AV (image + music → MP4) when probe finds assets.
     """
     picks, video_only_streams, audio_best = _collect_height_picks(raw_formats)
     options: list[DownloadOption] = []
@@ -348,7 +618,48 @@ def build_download_options(raw_formats: list[dict[str, Any]]) -> list[DownloadOp
                     filesize=use_size,
                 )
             )
-    else:
+    elif note_bundle:
+        options.append(
+            DownloadOption(
+                id="av:best",
+                label="最佳（视频+音频）",
+                sublabel="MP4 · 图文合成",
+                media_type="av",
+                quality="best",
+                format_id=NOTE_AV_FORMAT_ID,
+                recommended=True,
+            )
+        )
+
+    # Always offer「仅音频」when we have anything downloadable.
+    # Douyin real videos are often muxed A+V only (no separate audio-only format);
+    # download() will extract audio via ffmpeg / ba selectors in that case.
+    if audio_best or picks or note_bundle:
+        audio_size = _filesize_of(audio_best) if audio_best else None
+        audio_size_txt = _format_size_short(audio_size)
+        audio_ext = (
+            str(audio_best.get("ext") or "m4a").lstrip(".").upper()
+            if audio_best
+            else "M4A"
+        )
+        options.append(
+            DownloadOption(
+                id="audio:best",
+                label=f"仅音频（{audio_size_txt}）" if audio_size_txt else "仅音频",
+                sublabel=f"{audio_ext} · 仅音频",
+                media_type="audio",
+                quality="best",
+                format_id=(
+                    str(audio_best["format_id"])
+                    if audio_best and audio_best.get("format_id")
+                    else None
+                ),
+                filesize=audio_size,
+                recommended=not bool(picks) and not bool(note_bundle),
+            )
+        )
+    elif not picks and not note_bundle:
+        # Last-resort AV selector only when engine reported neither video nor audio tracks.
         options.append(
             DownloadOption(
                 id="av:best",
@@ -360,20 +671,24 @@ def build_download_options(raw_formats: list[dict[str, Any]]) -> list[DownloadOp
             )
         )
 
-    audio_size = _filesize_of(audio_best) if audio_best else None
-    audio_size_txt = _format_size_short(audio_size)
-    options.append(
-        DownloadOption(
-            id="audio:best",
-            label=f"仅音频（{audio_size_txt}）" if audio_size_txt else "仅音频",
-            sublabel="M4A · 仅音频",
-            media_type="audio",
-            quality="best",
-            format_id=str(audio_best["format_id"]) if audio_best and audio_best.get("format_id") else None,
-            filesize=audio_size,
-        )
-    )
     return options
+
+
+def parse_notice_for_options(
+    options: list[DownloadOption],
+    *,
+    note_bundle: Optional[dict[str, Any]] = None,
+) -> Optional[str]:
+    """User-facing hint when parse succeeded but content is not a normal video."""
+    if note_bundle:
+        n_img = len(note_bundle.get("image_urls") or [])
+        extra = f"（共 {n_img} 张图，合成时使用首图）" if n_img > 1 else ""
+        return f"该链接为图文笔记，将用图片+音频合成为可播放视频{extra}"
+    has_video_opt = any(o.media_type in {"av", "video"} for o in options)
+    has_audio_opt = any(o.media_type == "audio" for o in options)
+    if not has_video_opt and has_audio_opt:
+        return "该链接没有可下载的视频轨，仅可下载音频"
+    return None
 
 
 def resolve_option_id(option_id: Optional[str]) -> Optional[tuple[MediaType, str]]:
@@ -476,6 +791,11 @@ def _map_download_error(exc: BaseException) -> ServiceError:
 
     if "ffmpeg" in msg or "ffprobe" in msg:
         return ServiceError("下载该内容需要本机安装 ffmpeg", status_code=400)
+    if "missing audio/video" in msg or "output missing" in msg:
+        return ServiceError(
+            "该内容没有可下载的视频（可能是图文笔记），请选择「仅音频」或更换链接",
+            status_code=400,
+        )
     if "fresh cookies" in msg or ("cookie" in msg and "douyin" in msg):
         return ServiceError(
             "抖音暂时无法解析该视频，请稍后重试或换一条链接",
@@ -557,20 +877,34 @@ def parse(url: str) -> ParseResponse:
         if entries:
             data = entries[0] if isinstance(entries[0], dict) else data
 
-    options = build_download_options(data.get("formats") or [])
-    if not options:
-        raise ServiceError("暂无可用下载选项，请更换链接或稍后重试", status_code=400)
-
+    raw_formats = data.get("formats") or []
     video_id = str(data.get("id") or "")
     title = str(data.get("title") or "未命名视频")
     if not video_id:
         raise ServiceError("暂无法识别该链接，请确认是否为 yt-dlp 支持的站点")
 
+    note_bundle = None
+    if _is_douyin_family_host(urlparse(url).netloc):
+        note_bundle = probe_douyin_note_bundle(video_id)
+
+    # Image notes: ignore yt-dlp's mislabeled play_addr "1080p video" formats.
+    if note_bundle:
+        options = build_download_options([], note_bundle=note_bundle)
+    else:
+        options = build_download_options(raw_formats, note_bundle=None)
+    if not options:
+        raise ServiceError("暂无可用下载选项，请更换链接或稍后重试", status_code=400)
+
+    # Prefer music duration for image notes when engine duration is empty/0.
+    duration = data.get("duration")
+    if note_bundle and (not duration or float(duration) <= 0):
+        duration = float(note_bundle["duration"])
+
     return ParseResponse(
         id=video_id,
         title=title,
         thumbnail=data.get("thumbnail"),
-        duration=data.get("duration"),
+        duration=duration,
         uploader=data.get("uploader"),
         webpage_url=data.get("webpage_url") or url,
         extractor=data.get("extractor"),
@@ -579,6 +913,7 @@ def parse(url: str) -> ParseResponse:
         like_count=_as_optional_int(data.get("like_count")),
         upload_date=_format_upload_date(data.get("upload_date")),
         description=_clean_description(data.get("description")),
+        notice=parse_notice_for_options(options, note_bundle=note_bundle),
         options=options,
     )
 
@@ -809,6 +1144,12 @@ def _download_with_format(
         path = _resolve_filepath(data if isinstance(data, dict) else {}, ydl)
         if media_type == "video":
             path = _remux_mp4_for_players(path)
+            types = _ffprobe_stream_types(path)
+            # Douyin image-notes may ship audio/mp4 labeled as play_addr video.
+            if "video" not in types:
+                raise DownloadError(
+                    f"Output missing audio/video for video download (streams={sorted(types)})"
+                )
             path = _strip_audio_track(path)
         elif media_type == "audio":
             # Muxed progressive (common on Douyin): extract audio track
@@ -825,6 +1166,27 @@ def _download_with_format(
         return data, path
 
 
+def _try_download_douyin_note_av(url: str) -> Optional[dict[str, Any]]:
+    """If URL is a Douyin image/note, synthesize MP4 from image + music."""
+    aweme_id = _douyin_video_id_from_url(urlparse(url))
+    if not aweme_id:
+        return None
+    bundle = probe_douyin_note_bundle(aweme_id)
+    if not bundle:
+        return None
+    out_path = DOWNLOAD_DIR / f"{aweme_id}_note_av.mp4"
+    synthesize_douyin_note_av(bundle, out_path)
+    title = str(bundle.get("title") or aweme_id)
+    filename = _safe_filename(title, "mp4")
+    return {
+        "path": out_path,
+        "title": title,
+        "ext": "mp4",
+        "filename": filename,
+        "size": out_path.stat().st_size,
+    }
+
+
 def download(
     url: str,
     media_type: Optional[str] = "av",
@@ -836,7 +1198,20 @@ def download(
     mode = _normalize_media_type(media_type)
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    candidates = build_format_candidates(quality, mode, format_id)
+    pinned = (format_id or "").strip()
+    # Douyin image/notes: synthesize before trusting mislabeled play_addr formats.
+    if mode in {"av", "video"} and _is_douyin_family_host(urlparse(url).netloc):
+        note_result = _try_download_douyin_note_av(url)
+        if note_result is not None:
+            return note_result
+        if pinned == NOTE_AV_FORMAT_ID:
+            raise ServiceError("图文合成视频失败，请稍后重试或选择仅音频", status_code=502)
+
+    candidates = build_format_candidates(
+        quality,
+        mode,
+        None if pinned == NOTE_AV_FORMAT_ID else format_id,
+    )
     last_error: Optional[BaseException] = None
 
     for fmt in candidates:
@@ -875,6 +1250,12 @@ def download(
                 exc,
             )
             continue
+
+    # Fallback: Douyin image/note → synthesize AV after normal selectors fail.
+    if mode == "av" and _is_douyin_family_host(urlparse(url).netloc):
+        result = _try_download_douyin_note_av(url)
+        if result is not None:
+            return result
 
     if last_error is not None:
         raise _map_download_error(last_error)
