@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.api.summary_ext_routes import router as summary_ext_router
 from app.config import CORS_ORIGINS
 from app.services.file_registry import registry
 
@@ -33,3 +34,4 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(summary_ext_router)

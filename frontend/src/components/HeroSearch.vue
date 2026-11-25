@@ -8,7 +8,7 @@ const emit = defineEmits(['update:modelValue', 'parse'])
 </script>
 
 <template>
-  <section id="download" class="mx-auto max-w-6xl px-4 pb-4 pt-10 sm:px-6 sm:pt-14">
+  <section id="download" class="mx-auto max-w-6xl scroll-mt-28 px-4 pb-4 pt-10 sm:px-6 sm:pt-14">
     <div class="anim-rise mx-auto max-w-3xl text-center">
       <p
         class="mb-4 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-white/80 px-3 py-1 text-xs font-medium text-brand shadow-[var(--shadow-elev-1)]"

@@ -4,9 +4,10 @@ defineProps({
   selectedOptionId: { type: String, default: '' },
   downloading: { type: Boolean, default: false },
   downloadMessage: { type: String, default: '' },
+  summarizing: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:selectedOptionId', 'download'])
+const emit = defineEmits(['update:selectedOptionId', 'download', 'summarize'])
 
 function formatDuration(sec) {
   if (sec == null || Number.isNaN(Number(sec))) return null
@@ -28,8 +29,11 @@ function formatCount(n) {
 </script>
 
 <template>
-  <section v-if="result" class="anim-rise mx-auto max-w-6xl px-4 pb-10 sm:px-6">
-    <div class="rounded-3xl border border-line/80 bg-white p-4 shadow-[var(--shadow-elev-3)] sm:p-6">
+  <section v-if="result" class="anim-rise mx-auto max-w-6xl scroll-mt-28 px-4 pb-10 sm:px-6">
+    <div
+      id="result-panel"
+      class="rounded-3xl border border-line/80 bg-white p-4 shadow-[var(--shadow-elev-3)] sm:p-6"
+    >
       <div class="grid items-start gap-5 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-7">
         <aside class="w-full">
           <div class="relative aspect-video w-full overflow-hidden rounded-2xl bg-slate-900 shadow-[var(--shadow-elev-2)]">
@@ -67,7 +71,7 @@ function formatCount(n) {
           <div class="mt-3 rounded-2xl border border-vip/25 bg-gradient-to-br from-vip-soft to-white p-3.5">
             <p class="text-sm font-semibold text-vip-deep">VIP 下载更省心</p>
             <p class="mt-1 text-xs leading-relaxed text-muted">
-              高清优先队列 · 批量加速 · AI 总结
+              高清优先队列 · 批量加速 · 更多 AI 能力
             </p>
             <a
               href="#features"
@@ -173,10 +177,18 @@ function formatCount(n) {
             <button
               type="button"
               class="flex min-h-12 flex-1 cursor-pointer items-center justify-center rounded-xl bg-brand px-4 text-base font-semibold text-white shadow-[var(--shadow-elev-2)] transition duration-200 hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="downloading || !selectedOptionId"
+              :disabled="downloading || summarizing || !selectedOptionId"
               @click="emit('download')"
             >
               {{ downloading ? '下载中…' : '下载到本地' }}
+            </button>
+            <button
+              type="button"
+              class="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-brand/35 bg-brand-soft px-5 text-sm font-semibold text-brand transition duration-200 hover:border-brand/55 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-[140px]"
+              :disabled="downloading || summarizing"
+              @click="emit('summarize')"
+            >
+              {{ summarizing ? '总结中…' : 'AI 总结' }}
             </button>
             <a
               href="#features"
@@ -186,6 +198,9 @@ function formatCount(n) {
             </a>
           </div>
           <p v-if="downloading" class="mt-2 text-xs text-muted">大文件请耐心等待…</p>
+          <p v-if="summarizing" class="mt-2 text-xs text-muted">
+            正在拉取字幕并调用 AI，长视频可能需要一两分钟…
+          </p>
           <p v-if="downloadMessage" class="mt-2 text-xs font-medium text-emerald-600">
             {{ downloadMessage }}
           </p>

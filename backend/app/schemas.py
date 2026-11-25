@@ -60,3 +60,59 @@ class HealthResponse(BaseModel):
     ok: bool
     yt_dlp: Optional[str] = None
     ffmpeg: bool
+    llm_configured: bool = False
+
+
+class SummarizeRequest(BaseModel):
+    url: str = Field(..., description="Video page URL")
+
+
+class SummaryChapter(BaseModel):
+    start: str
+    title: str
+    summary: str = ""
+
+
+class SummaryKeyPoint(BaseModel):
+    timestamp: str
+    text: str
+
+
+class SummarizeResponse(BaseModel):
+    title: str
+    source_lang: Optional[str] = None
+    subtitle_kind: Literal["manual", "auto"]
+    summary: str
+    chapters: list[SummaryChapter]
+    key_points: list[SummaryKeyPoint]
+    markdown: str
+    transcript: Optional[str] = None
+
+
+# --- Summary extensions (mindmap / chat); do not alter SummarizeResponse contract ---
+
+
+class MindmapRequest(BaseModel):
+    title: str = ""
+    summary: str = ""
+    chapters: list[SummaryChapter] = []
+    key_points: list[SummaryKeyPoint] = []
+
+
+class MindmapResponse(BaseModel):
+    markdown: str
+    source: Literal["llm", "fallback"] = "llm"
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatStreamRequest(BaseModel):
+    title: str = ""
+    summary: str = ""
+    transcript: Optional[str] = None
+    chapters: list[SummaryChapter] = []
+    key_points: list[SummaryKeyPoint] = []
+    messages: list[ChatMessage]

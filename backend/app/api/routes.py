@@ -2,20 +2,26 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+from collections.abc import Iterator
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 
-from app.config import DOWNLOAD_TIMEOUT_SECONDS
+from app.config import DOWNLOAD_TIMEOUT_SECONDS, SUMMARY_TIMEOUT_SECONDS
 from app.schemas import (
     DownloadRequest,
     DownloadResponse,
     HealthResponse,
     ParseRequest,
     ParseResponse,
+    SummarizeRequest,
+    SummarizeResponse,
 )
 from app.services import ytdlp_service
 from app.services.file_registry import registry
+from app.services.summary_service import iter_summarize_events, llm_configured, summarize
 from app.services.ytdlp_service import ServiceError
 
 logger = logging.getLogger(__name__)
@@ -32,6 +38,7 @@ def health() -> HealthResponse:
         ok=True,
         yt_dlp=ytdlp_service.yt_dlp_version(),
         ffmpeg=ytdlp_service.ffmpeg_available(),
+        llm_configured=llm_configured(),
     )
 
 
@@ -107,3 +114,33 @@ def get_file(file_id: str) -> FileResponse:
         media_type="application/octet-stream",
         content_disposition_type="attachment",
     )
+
+
+@router.post("/summarize", response_model=SummarizeResponse)
+def summarize_video(body: SummarizeRequest) -> SummarizeResponse:
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(summarize, body.url)
+            try:
+                return future.result(timeout=SUMMARY_TIMEOUT_SECONDS + 60)
+            except concurrent.futures.TimeoutError as exc:
+                raise HTTPException(
+                    status_code=504,
+                    detail="AI 总结超时，请稍后重试或换较短视频",
+                ) from exc
+    except ServiceError as exc:
+        _raise_service_error(exc)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Unexpected summarize failure")
+        raise HTTPException(status_code=502, detail="AI 总结失败，请稍后重试") from exc
+
+
+@router.post("/summarize/stream", response_class=EventSourceResponse)
+def summarize_video_stream(body: SummarizeRequest) -> Iterator[ServerSentEvent]:
+    """SSE：整体摘要流式输出，章节与要点并行生成后推送。"""
+    for item in iter_summarize_events(body.url):
+        event = str(item.get("event") or "message")
+        data: Any = item.get("data")
+        yield ServerSentEvent(event=event, data=data)

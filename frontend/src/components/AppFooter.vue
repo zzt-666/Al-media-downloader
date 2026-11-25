@@ -17,7 +17,9 @@
         </div>
         <div class="rounded-2xl border border-vip/20 bg-vip-soft/60 p-4">
           <p class="font-semibold text-vip-deep">想解锁更多？</p>
-          <p class="mt-1.5 text-sm text-muted">VIP 批量加速、AI 总结与字幕翻译即将上线。</p>
+          <p class="mt-1.5 text-sm text-muted">
+            AI 总结已可用（需本机配置 API Key）；字幕翻译与 VIP 支付即将上线。
+          </p>
           <a
             href="#features"
             class="mt-3 inline-flex min-h-11 items-center rounded-xl bg-gradient-to-r from-vip to-[#d4a017] px-4 text-sm font-semibold text-white transition duration-200 hover:brightness-105"

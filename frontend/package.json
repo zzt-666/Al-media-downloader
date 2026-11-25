@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "markmap-lib": "^0.18.13",
+    "markmap-view": "^0.18.13",
     "vue": "^3.5.44"
   },
   "devDependencies": {

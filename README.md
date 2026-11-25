@@ -10,6 +10,7 @@
 - 解析公开视频元数据（标题、封面、时长、播放/点赞等，视站点而定）
 - 一卡选项：清晰度 + 格式（视频+音频 / 仅视频 / 仅音频）
 - 优先兼容播放的 H.264（+ AAC）；抖音等站点做链接规范化与必要兼容处理
+- **AI 视频总结**：有字幕的视频可一键生成整体摘要、章节大纲与核心知识点，并导出 Markdown
 - 本机并发下载限制为 1；临时文件约 1 小时清理
 
 ## 环境要求
@@ -32,7 +33,19 @@ uv pip install -r requirements.txt --python .venv/Scripts/python.exe   # Windows
 ```
 
 健康检查：<http://127.0.0.1:8000/api/health>  
-期望包含 `ok`、`yt_dlp` 版本、`ffmpeg` 布尔值。
+期望包含 `ok`、`yt_dlp` 版本、`ffmpeg`、`llm_configured`。
+
+### AI 总结（`backend/.env`）
+
+未配置时解析/下载仍可用；点击「AI 总结」会提示缺少 Key。
+
+1. 打开 [backend/.env](backend/.env)（已 gitignore，勿提交）
+2. 填写 DeepSeek Key，例如：`SUMMARY_LLM_API_KEY=sk-...`
+3. 保存后**重启后端**
+
+也可从 [backend/.env.example](backend/.env.example) 复制一份。`SUMMARY_LLM_BASE_URL` / `SUMMARY_LLM_MODEL` 已默认指向 DeepSeek。
+
+设计说明见 [docs/AI视频总结方案设计.md](docs/AI视频总结方案设计.md)。首版**仅支持有字幕**（人工或自动）的视频。
 
 ## 启动前端
 
@@ -60,10 +73,11 @@ npm run dev
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/health` | 依赖自检 |
+| GET | `/api/health` | 依赖自检（含 `llm_configured`） |
 | POST | `/api/parse` | `{ "url" }` → 元数据与 `options` 列表 |
 | POST | `/api/download` | `{ "url", "option_id?", "media_type?", "quality?", "format_id?" }` → `{ file_id, filename, size }` |
 | GET | `/api/files/{file_id}` | 附件下载 |
+| POST | `/api/summarize` | `{ "url" }` → 摘要 / 章节 / 要点 / `markdown`（需配置 LLM） |
 
 ## 许可证
 

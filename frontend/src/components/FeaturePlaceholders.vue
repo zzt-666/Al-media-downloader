@@ -33,7 +33,7 @@ const plans = [
     features: [
       '批量下载加速队列',
       '高清优先处理',
-      'AI 视频总结',
+      'AI 视频总结（本机已可用）',
       '字幕翻译多语言',
       '更大并发额度',
     ],
@@ -53,21 +53,25 @@ const plans = [
 const extras = [
   {
     title: 'AI 视频总结',
-    desc: '自动提炼要点与章节，复习效率翻倍。',
+    desc: '解析后一键提炼摘要、章节大纲与知识点，可导出 Markdown。',
+    status: 'available',
+    href: '#result',
   },
   {
     title: '字幕翻译',
     desc: '多语言字幕生成与翻译，跨语种无压力。',
+    status: 'soon',
   },
   {
     title: '批量加速',
     desc: '排队优先、并发提升，多任务一次搞定。',
+    status: 'soon',
   },
 ]
 </script>
 
 <template>
-  <section id="features" class="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+  <section id="features" class="mx-auto max-w-6xl scroll-mt-28 px-4 py-12 sm:px-6 sm:py-16">
     <div class="mx-auto max-w-2xl text-center">
       <p class="text-sm font-semibold tracking-wide text-vip">会员特权</p>
       <h2 class="mt-2 text-2xl font-bold text-ink sm:text-3xl">升级 VIP，下载更快更聪明</h2>
@@ -143,15 +147,26 @@ const extras = [
     </p>
 
     <div class="mt-8 grid gap-3 sm:grid-cols-3">
-      <div
+      <component
+        :is="item.href ? 'a' : 'div'"
         v-for="item in extras"
         :key="item.title"
+        :href="item.href || undefined"
         class="rounded-2xl border border-line/80 bg-white/80 p-4 shadow-[var(--shadow-elev-1)]"
+        :class="item.href ? 'transition hover:border-brand/40 hover:shadow-[var(--shadow-elev-2)]' : ''"
       >
         <h4 class="font-semibold text-ink">{{ item.title }}</h4>
         <p class="mt-1.5 text-sm leading-relaxed text-muted">{{ item.desc }}</p>
-        <span class="mt-3 inline-block text-xs font-medium text-vip">VIP 专属 · 即将上线</span>
-      </div>
+        <span
+          v-if="item.status === 'available'"
+          class="mt-3 inline-block text-xs font-medium text-brand"
+        >
+          解析后可用 · 需配置 LLM API Key
+        </span>
+        <span v-else class="mt-3 inline-block text-xs font-medium text-vip">
+          VIP 专属 · 即将上线
+        </span>
+      </component>
     </div>
   </section>
 </template>

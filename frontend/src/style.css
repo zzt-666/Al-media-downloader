@@ -21,6 +21,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* sticky 顶栏高度预留，修复 #download / #features 等锚点被遮挡 */
+  scroll-padding-top: 6.5rem;
 }
 
 body {
