@@ -1,6 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { SUMMARY_EXTENSION_TABS } from './summary/extensions'
+import { downloadBlob, safeDownloadName } from '../utils/downloadBlob'
+import { renderMarkdown } from '../utils/renderMarkdown'
+import { transcriptToSrt } from '../utils/transcriptExport'
 
 const props = defineProps({
   summary: { type: Object, default: null },
@@ -12,6 +15,7 @@ const props = defineProps({
 
 const activeTab = ref('summary')
 const copyTip = ref('')
+const subTip = ref('')
 
 const CORE_TABS = [
   { id: 'summary', label: '全文总结' },
@@ -32,10 +36,14 @@ const summaryReady = computed(
     !!(props.summary?.summary || props.summary?.chapters?.length || props.summary?.markdown),
 )
 
-const safeName = computed(() => {
-  const title = props.summary?.title || '视频总结'
-  return title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 80)
+const safeName = computed(() => safeDownloadName(props.summary?.title, '视频总结'))
+
+const exportMarkdown = computed(() => {
+  const md = props.summary?.markdown || props.summary?.summary || ''
+  return String(md).trim()
 })
+
+const summaryHtml = computed(() => renderMarkdown(props.summary?.summary || ''))
 
 const chapterCount = computed(() => props.summary?.chapters?.length || 0)
 const pointCount = computed(() => props.summary?.key_points?.length || 0)
@@ -44,7 +52,7 @@ const statusText = computed(() => {
   if (props.error) return '总结失败'
   if (props.stage === 'fetching_subtitles') return '正在拉取字幕…'
   if (props.stage === 'generating') {
-    if (props.streaming) return '正在流式生成整体摘要，章节同步生成中…'
+    if (props.streaming) return '正在流式生成全文总结，章节同步生成中…'
     return '正在生成总结…'
   }
   if (props.stage === 'done' || (props.summary?.markdown && !props.loading)) {
@@ -74,7 +82,7 @@ function tabLabel(tab) {
 }
 
 async function copyMarkdown() {
-  const md = props.summary?.markdown
+  const md = exportMarkdown.value
   if (!md) return
   try {
     await navigator.clipboard.writeText(md)
@@ -88,17 +96,37 @@ async function copyMarkdown() {
 }
 
 function downloadMarkdown() {
-  const md = props.summary?.markdown
+  const md = exportMarkdown.value
   if (!md) return
-  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${safeName.value}-总结.md`
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
+  downloadBlob(md, `${safeName.value}-总结.md`, 'text/markdown;charset=utf-8')
+}
+
+function downloadTranscriptTxt() {
+  const text = props.summary?.transcript
+  if (!text) return
+  downloadBlob(text, `${safeName.value}-字幕.txt`, 'text/plain;charset=utf-8')
+  subTip.value = '已下载 TXT'
+  setTimeout(() => {
+    subTip.value = ''
+  }, 2000)
+}
+
+function downloadTranscriptSrt() {
+  const text = props.summary?.transcript
+  if (!text) return
+  const srt = transcriptToSrt(text)
+  if (!srt) {
+    subTip.value = '无法转换为 SRT'
+    setTimeout(() => {
+      subTip.value = ''
+    }, 2000)
+    return
+  }
+  downloadBlob(srt, `${safeName.value}-字幕.srt`, 'application/x-subrip;charset=utf-8')
+  subTip.value = '已下载 SRT'
+  setTimeout(() => {
+    subTip.value = ''
+  }, 2000)
 }
 </script>
 
@@ -151,22 +179,6 @@ function downloadMarkdown() {
             />
             {{ statusText }}
           </span>
-          <button
-            v-if="summary?.markdown && !error"
-            type="button"
-            class="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl border border-line bg-page px-4 text-sm font-semibold text-ink transition hover:border-brand/40 hover:bg-brand-soft/40"
-            @click="copyMarkdown"
-          >
-            复制 Markdown
-          </button>
-          <button
-            v-if="summary?.markdown && !error"
-            type="button"
-            class="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark"
-            @click="downloadMarkdown"
-          >
-            下载 .md
-          </button>
         </div>
       </div>
 
@@ -182,10 +194,6 @@ function downloadMarkdown() {
       </div>
 
       <template v-else>
-        <p v-if="copyTip" class="px-4 pt-3 text-xs font-medium text-emerald-600 sm:px-6">
-          {{ copyTip }}
-        </p>
-
         <!-- Tabs -->
         <div
           role="tablist"
@@ -217,6 +225,27 @@ function downloadMarkdown() {
         <div class="min-h-[220px] px-4 py-5 sm:px-6">
           <!-- 全文总结 -->
           <div v-show="activeTab === 'summary'" role="tabpanel">
+            <div
+              v-if="exportMarkdown && !error"
+              class="mb-4 flex flex-wrap items-center gap-2"
+            >
+              <button
+                type="button"
+                class="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl border border-line bg-page px-4 text-sm font-semibold text-ink transition hover:border-brand/40 hover:bg-brand-soft/40"
+                @click="copyMarkdown"
+              >
+                复制 Markdown
+              </button>
+              <button
+                type="button"
+                class="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                @click="downloadMarkdown"
+              >
+                下载 .md
+              </button>
+              <span v-if="copyTip" class="text-xs font-medium text-emerald-600">{{ copyTip }}</span>
+            </div>
+
             <div v-if="!summary?.summary && loading" class="space-y-3">
               <div class="h-4 w-3/4 animate-pulse rounded bg-slate-100" />
               <div class="h-4 w-full animate-pulse rounded bg-slate-100" />
@@ -224,14 +253,15 @@ function downloadMarkdown() {
               <p class="pt-2 text-sm text-muted">{{ statusText || '请稍候…' }}</p>
             </div>
             <div v-else-if="summary?.summary" class="relative">
-              <h3 class="text-sm font-semibold text-ink">摘要</h3>
-              <p class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink/90">
-                {{ summary.summary }}<span
-                  v-if="streaming"
-                  class="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-brand align-[-2px]"
-                  aria-hidden="true"
-                />
-              </p>
+              <div
+                class="summary-md text-sm leading-relaxed text-ink/90"
+                v-html="summaryHtml"
+              />
+              <span
+                v-if="streaming"
+                class="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-brand align-[-2px]"
+                aria-hidden="true"
+              />
               <p v-if="streaming" class="mt-3 text-xs text-muted">章节大纲与知识点正在同步生成…</p>
             </div>
             <p v-else class="text-sm text-muted">暂无整体摘要</p>
@@ -288,6 +318,26 @@ function downloadMarkdown() {
 
           <!-- 字幕原文 -->
           <div v-show="activeTab === 'transcript'" role="tabpanel">
+            <div
+              v-if="summary?.transcript"
+              class="mb-3 flex flex-wrap items-center gap-2"
+            >
+              <button
+                type="button"
+                class="inline-flex min-h-9 cursor-pointer items-center rounded-xl border border-line bg-page px-3 text-xs font-semibold text-ink transition hover:border-brand/40 hover:bg-brand-soft/40"
+                @click="downloadTranscriptTxt"
+              >
+                下载 TXT
+              </button>
+              <button
+                type="button"
+                class="inline-flex min-h-9 cursor-pointer items-center rounded-xl border border-line bg-page px-3 text-xs font-semibold text-ink transition hover:border-brand/40 hover:bg-brand-soft/40"
+                @click="downloadTranscriptSrt"
+              >
+                下载 SRT
+              </button>
+              <span v-if="subTip" class="text-xs font-medium text-emerald-600">{{ subTip }}</span>
+            </div>
             <div
               v-if="loading && !summary?.transcript"
               class="rounded-2xl border border-dashed border-line bg-page/50 px-4 py-8 text-center text-sm text-muted"

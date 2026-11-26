@@ -21,23 +21,32 @@ from app.services.ytdlp_service import ServiceError
 
 logger = logging.getLogger(__name__)
 
+_SUMMARY_MD_STRUCTURE = """全文总结必须使用 Markdown，且严格包含以下四个二级标题（可在各节下使用列表/加粗）：
+## 一句话概括
+## 内容要点
+## 关键结论 / 观点
+## 适合谁看
+总体信息量约 600-1200 字；不要输出一级标题；不要用代码围栏包裹全文。"""
+
 _SYSTEM_PROMPT = """你是视频学习助手。根据带时间戳的字幕文稿，输出 JSON（不要 Markdown 围栏），字段：
 {
-  "summary": "200-400字整体摘要，中文",
+  "summary": "Markdown 全文总结（字符串）",
   "chapters": [{"start":"MM:SS或HH:MM:SS","title":"章节标题","summary":"章节要点"}],
   "key_points": [{"timestamp":"MM:SS或HH:MM:SS","text":"知识点"}]
 }
 要求：
-1. chapters 按时间顺序，覆盖全片主要结构，约 3-12 章；
-2. key_points 提炼 5-12 条核心知识，timestamp 尽量对齐字幕；
-3. 只依据字幕，不编造字幕未出现的事实；
-4. 全文使用简体中文。"""
+1. summary 字段为 Markdown 字符串，""" + _SUMMARY_MD_STRUCTURE + """
+2. chapters 按时间顺序，覆盖全片主要结构，约 3-12 章；
+3. key_points 提炼 5-12 条核心知识，timestamp 尽量对齐字幕；
+4. 只依据字幕，不编造字幕未出现的事实；
+5. 全文使用简体中文。"""
 
-_SUMMARY_STREAM_SYSTEM = """你是视频学习助手。根据带时间戳的字幕文稿，用简体中文写一段 200-400 字的整体摘要。
+_SUMMARY_STREAM_SYSTEM = """你是视频学习助手。根据带时间戳的字幕文稿，用简体中文输出一份 Markdown 全文总结。
 要求：
-1. 只输出摘要正文，不要标题、不要 Markdown、不要 JSON、不要列表符号；
-2. 只依据字幕，不编造字幕未出现的事实；
-3. 覆盖视频主旨与关键结论，语言流畅可读。"""
+1. """ + _SUMMARY_MD_STRUCTURE + """
+2. 只输出 Markdown 正文，不要 JSON，不要解释性前后缀；
+3. 只依据字幕，不编造字幕未出现的事实；
+4. 覆盖视频主旨、要点与关键结论，语言流畅可读。"""
 
 _STRUCTURE_SYSTEM = """你是视频学习助手。根据带时间戳的字幕文稿，输出 JSON（不要 Markdown 围栏），字段：
 {
@@ -184,7 +193,7 @@ def _iter_stream_summary(title: str, transcript: str) -> Iterator[str]:
     _require_llm_key()
     user_prompt = (
         f"视频标题：{title}\n\n字幕文稿（带时间戳）：\n{transcript}\n\n"
-        "请直接输出整体摘要正文。"
+        "请直接输出 Markdown 全文总结正文。"
     )
     payload = {
         "model": SUMMARY_LLM_MODEL,
@@ -276,45 +285,35 @@ def _to_key_points(raw: Any) -> list[SummaryKeyPoint]:
     return out
 
 
-def build_markdown(
-    title: str,
-    summary: str,
-    chapters: list[SummaryChapter],
-    key_points: list[SummaryKeyPoint],
-) -> str:
-    lines = [f"# {title}", "", "## 整体摘要", "", summary.strip() or "（无）", ""]
-    lines.extend(["## 章节大纲", ""])
-    if chapters:
-        for ch in chapters:
-            lines.append(f"### [{ch.start}] {ch.title}")
-            if ch.summary:
-                lines.append("")
-                lines.append(ch.summary)
-            lines.append("")
-    else:
-        lines.append("（无）")
-        lines.append("")
-    lines.extend(["## 核心知识点", ""])
-    if key_points:
-        for kp in key_points:
-            lines.append(f"- **[{kp.timestamp}]** {kp.text}")
-    else:
-        lines.append("- （无）")
-    lines.append("")
-    return "\n".join(lines).strip() + "\n"
+def _strip_md_fence(text: str) -> str:
+    content = (text or "").strip()
+    if content.startswith("```"):
+        content = re.sub(r"^```(?:markdown|md)?\s*", "", content)
+        content = re.sub(r"\s*```$", "", content)
+    return content.strip()
+
+
+def build_markdown(title: str, summary: str, *_unused: Any) -> str:
+    """Exportable Markdown: full-text summary only (no chapters / key points)."""
+    body = _strip_md_fence(summary) or "（无）"
+    title = (title or "视频总结").strip() or "视频总结"
+    # Only skip the title when the body already has a top-level heading.
+    if re.match(r"^#\s+", body.lstrip()):
+        return body + ("\n" if not body.endswith("\n") else "")
+    return f"# {title}\n\n{body}\n"
 
 
 def summarize_from_transcript(tr: TranscriptResult) -> SummarizeResponse:
     clipped = _truncate_transcript(tr.text, SUMMARY_MAX_TRANSCRIPT_CHARS)
     data = _call_llm(tr.title, clipped)
-    summary = str(data.get("summary") or "").strip()
+    summary = _strip_md_fence(str(data.get("summary") or ""))
     chapters = _to_chapters(data.get("chapters"))
     key_points = _to_key_points(data.get("key_points"))
     if not summary and not chapters and not key_points:
         raise ServiceError("AI 未能生成有效总结，请稍后重试", status_code=502)
     if not summary:
         summary = "（模型未返回整体摘要，请参考章节与要点。）"
-    md = build_markdown(tr.title, summary, chapters, key_points)
+    md = build_markdown(tr.title, summary)
     return SummarizeResponse(
         title=tr.title,
         source_lang=tr.language,
@@ -386,7 +385,7 @@ def iter_summarize_events(url: str) -> Iterator[dict[str, Any]]:
                     except Exception as exc:  # noqa: BLE001
                         structure_error = exc
 
-            summary_text = "".join(summary_parts).strip()
+            summary_text = _strip_md_fence("".join(summary_parts))
             if not summary_text:
                 raise ServiceError("AI 未能生成整体摘要，请稍后重试", status_code=502)
             yield {"event": "summary", "data": {"summary": summary_text}}
@@ -419,7 +418,7 @@ def iter_summarize_events(url: str) -> Iterator[dict[str, Any]]:
             "data": {"key_points": [k.model_dump() for k in key_points]},
         }
 
-        md = build_markdown(tr.title, summary_text, chapters, key_points)
+        md = build_markdown(tr.title, summary_text)
         yield {"event": "status", "data": {"stage": "done"}}
         yield {"event": "done", "data": {"markdown": md}}
     except ServiceError as exc:

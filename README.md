@@ -10,7 +10,7 @@
 - 解析公开视频元数据（标题、封面、时长、播放/点赞等，视站点而定）
 - 一卡选项：清晰度 + 格式（视频+音频 / 仅视频 / 仅音频）
 - 优先兼容播放的 H.264（+ AAC）；抖音等站点做链接规范化与必要兼容处理
-- **AI 视频总结**：有字幕的视频可一键生成整体摘要、章节大纲与核心知识点，并导出 Markdown
+- **AI 视频总结**：有字幕的视频可流式生成整体摘要、章节大纲与核心知识点，并支持思维导图、AI 对话与 Markdown 导出
 - 本机并发下载限制为 1；临时文件约 1 小时清理
 
 ## 环境要求
@@ -45,7 +45,7 @@ uv pip install -r requirements.txt --python .venv/Scripts/python.exe   # Windows
 
 也可从 [backend/.env.example](backend/.env.example) 复制一份。`SUMMARY_LLM_BASE_URL` / `SUMMARY_LLM_MODEL` 已默认指向 DeepSeek。
 
-设计说明见 [docs/AI视频总结方案设计.md](docs/AI视频总结方案设计.md)。首版**仅支持有字幕**（人工或自动）的视频。
+功能沉淀见 [docs/AI视频总结功能总结.md](docs/AI视频总结功能总结.md)；立项方案见 [docs/AI视频总结方案设计.md](docs/AI视频总结方案设计.md)。当前**仅支持有字幕**（人工或自动）的视频。
 
 ## 启动前端
 
@@ -78,6 +78,9 @@ npm run dev
 | POST | `/api/download` | `{ "url", "option_id?", "media_type?", "quality?", "format_id?" }` → `{ file_id, filename, size }` |
 | GET | `/api/files/{file_id}` | 附件下载 |
 | POST | `/api/summarize` | `{ "url" }` → 摘要 / 章节 / 要点 / `markdown`（需配置 LLM） |
+| POST | `/api/summarize/stream` | SSE 流式总结（前端主路径） |
+| POST | `/api/summarize/mindmap` | 基于已有总结生成思维导图 Markdown |
+| POST | `/api/summarize/chat/stream` | 基于已有总结的 AI 对话（SSE） |
 
 ## 许可证
 

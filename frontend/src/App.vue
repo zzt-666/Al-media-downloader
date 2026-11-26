@@ -175,7 +175,12 @@ async function onSummarize() {
         if (event === 'summary') {
           summaryStreaming.value = false
           if (data?.summary) {
-            summary.value = { ...summary.value, summary: data.summary }
+            summary.value = {
+              ...summary.value,
+              summary: data.summary,
+              // markdown 现仅为全文总结；done 事件会再对齐带标题版本
+              markdown: data.summary,
+            }
           }
           return
         }

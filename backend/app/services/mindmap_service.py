@@ -30,14 +30,16 @@ def build_fallback_markdown(
     lines = [f"# {root}", ""]
     if summary.strip():
         lines.append("## 整体摘要")
-        # Keep short bullets from summary sentences
-        parts = re.split(r"[。！？\n]+", summary.strip())
-        bullets = [p.strip() for p in parts if p.strip()][:6]
+        # Strip markdown markers so fallback bullets stay readable
+        plain = re.sub(r"^#{1,6}\s*", "", summary.strip(), flags=re.M)
+        plain = re.sub(r"[*`_#>]+", "", plain)
+        parts = re.split(r"[。！？\n]+", plain)
+        bullets = [p.strip(" -") for p in parts if p.strip(" -")][:8]
         if bullets:
             for b in bullets:
-                lines.append(f"- {b}")
+                lines.append(f"- {b[:120]}")
         else:
-            lines.append(f"- {summary.strip()[:120]}")
+            lines.append(f"- {plain[:120]}")
         lines.append("")
     if chapters:
         lines.append("## 章节结构")
