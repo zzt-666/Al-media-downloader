@@ -242,7 +242,7 @@ onBeforeUnmount(() => {
       v-if="!ready"
       class="rounded-2xl border border-dashed border-line bg-page/50 px-4 py-10 text-center text-sm text-muted"
     >
-      请先完成视频总结后再查看思维导图
+      正在生成思维导图…
     </div>
     <div
       v-else-if="error"

@@ -53,9 +53,9 @@ const plans = [
 const extras = [
   {
     title: 'AI 视频总结',
-    desc: '解析后一键提炼摘要、章节大纲与知识点，可导出 Markdown。',
+    desc: '解析成功后自动总结，同屏查看摘要、章节大纲与知识点，可导出 Markdown。',
     status: 'available',
-    href: '#result',
+    href: '#result-workspace',
   },
   {
     title: '字幕翻译',
@@ -161,7 +161,7 @@ const extras = [
           v-if="item.status === 'available'"
           class="mt-3 inline-block text-xs font-medium text-brand"
         >
-          解析后可用 · 需配置 LLM API Key
+          解析后自动总结 · 需配置 LLM API Key
         </span>
         <span v-else class="mt-3 inline-block text-xs font-medium text-vip">
           VIP 专属 · 即将上线

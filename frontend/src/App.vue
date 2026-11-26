@@ -3,8 +3,7 @@ import { nextTick, ref } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import HeroSearch from './components/HeroSearch.vue'
 import PlatformPills from './components/PlatformPills.vue'
-import ParseResult from './components/ParseResult.vue'
-import SummaryPanel from './components/SummaryPanel.vue'
+import ResultWorkspace from './components/ResultWorkspace.vue'
 import FeaturePlaceholders from './components/FeaturePlaceholders.vue'
 import AppFooter from './components/AppFooter.vue'
 import { downloadVideo, parseVideo, saveFile, summarizeVideoStream } from './api/client'
@@ -36,30 +35,25 @@ function scrollPanelIntoView(id) {
   const viewTop = window.scrollY + headerH + gap
   const viewBottom = window.scrollY + window.innerHeight - gap
 
-  // 已完整露在顶栏下方可视区内则不动
   if (absoluteTop >= viewTop - 1 && absoluteBottom <= viewBottom + 1) return
 
-  const available = window.innerHeight - headerH - gap * 2
-  let targetScroll
-  if (rect.height <= available) {
-    // 整框能放下：顶对齐到顶栏下方
-    targetScroll = absoluteTop - headerH - gap
-  } else {
-    // 框过高：至少露出顶部（仍避开顶栏）
-    targetScroll = absoluteTop - headerH - gap
-  }
+  const targetScroll = absoluteTop - headerH - gap
   window.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' })
 }
 
-function scrollToResultPanel() {
-  scrollPanelIntoView('result-panel')
+function scrollToWorkspace() {
+  scrollPanelIntoView('result-workspace')
 }
 
-function scrollToSummaryPanel() {
-  scrollPanelIntoView('summary-panel')
+function abortSummarize() {
+  if (summarizeAbort) {
+    summarizeAbort.abort()
+    summarizeAbort = null
+  }
 }
 
 async function onParse() {
+  abortSummarize()
   error.value = ''
   summaryError.value = ''
   downloadMessage.value = ''
@@ -67,6 +61,7 @@ async function onParse() {
   summary.value = null
   summaryStage.value = ''
   summaryStreaming.value = false
+  summarizing.value = false
   selectedOptionId.value = ''
   parsing.value = true
   try {
@@ -76,7 +71,9 @@ async function onParse() {
       data.options?.find((o) => o.recommended) || data.options?.[0] || null
     selectedOptionId.value = preferred?.id || ''
     await nextTick()
-    requestAnimationFrame(() => scrollToResultPanel())
+    requestAnimationFrame(() => scrollToWorkspace())
+    // 解析成功后自动总结（无需再点）
+    void onSummarize({ fromParse: true })
   } catch (e) {
     error.value = e?.message || '解析失败，请稍后重试'
   } finally {
@@ -120,15 +117,18 @@ function emptySummary() {
   }
 }
 
-async function onSummarize() {
+/**
+ * @param {{ fromParse?: boolean }} [opts]
+ */
+async function onSummarize(opts = {}) {
   if (!url.value.trim()) {
     error.value = '请先粘贴并解析视频链接'
     return
   }
-  if (summarizeAbort) {
-    summarizeAbort.abort()
-    summarizeAbort = null
-  }
+  // 总结进行中禁止重复触发（自动解析触发除外：此时刚清过状态）
+  if (summarizing.value && !opts.fromParse) return
+
+  abortSummarize()
   error.value = ''
   summaryError.value = ''
   summarizing.value = true
@@ -144,9 +144,6 @@ async function onSummarize() {
   let streamError = null
 
   try {
-    await nextTick()
-    requestAnimationFrame(() => scrollToSummaryPanel())
-
     await summarizeVideoStream(url.value.trim(), {
       signal: ac.signal,
       onEvent(event, data) {
@@ -178,7 +175,6 @@ async function onSummarize() {
             summary.value = {
               ...summary.value,
               summary: data.summary,
-              // markdown 现仅为全文总结；done 事件会再对齐带标题版本
               markdown: data.summary,
             }
           }
@@ -220,15 +216,10 @@ async function onSummarize() {
       throw new Error('AI 未能生成有效总结，请稍后重试')
     }
     summaryStage.value = 'done'
-    await nextTick()
-    requestAnimationFrame(() => scrollToSummaryPanel())
   } catch (e) {
     if (e?.name === 'AbortError') return
-    // 展示在总结面板内，避免用户还要往上滑才能看到
     summaryError.value = e?.message || 'AI 总结失败，请稍后重试'
     summaryStage.value = ''
-    await nextTick()
-    requestAnimationFrame(() => scrollToSummaryPanel())
   } finally {
     summarizing.value = false
     summaryStreaming.value = false
@@ -253,24 +244,18 @@ async function onSummarize() {
         </div>
       </div>
 
-      <div id="result">
-        <ParseResult
-          :result="result"
-          v-model:selected-option-id="selectedOptionId"
-          :downloading="downloading"
-          :download-message="downloadMessage"
-          :summarizing="summarizing"
-          @download="onDownload"
-          @summarize="onSummarize"
-        />
-      </div>
-
-      <SummaryPanel
+      <ResultWorkspace
+        :result="result"
+        v-model:selected-option-id="selectedOptionId"
+        :downloading="downloading"
+        :download-message="downloadMessage"
+        :summarizing="summarizing"
         :summary="summary"
-        :loading="summarizing"
-        :streaming="summaryStreaming"
-        :stage="summaryStage"
-        :error="summaryError"
+        :summary-streaming="summaryStreaming"
+        :summary-stage="summaryStage"
+        :summary-error="summaryError"
+        @download="onDownload"
+        @summarize="onSummarize"
       />
 
       <FeaturePlaceholders />
