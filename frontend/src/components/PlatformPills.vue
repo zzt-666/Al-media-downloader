@@ -1,14 +1,5 @@
 <script setup>
-const platforms = [
-  'YouTube',
-  'B站',
-  'TikTok',
-  '抖音',
-  'Twitter/X',
-  'Instagram',
-  'Facebook',
-  'Vimeo',
-]
+const platforms = ['YouTube', 'B站', '抖音']
 </script>
 
 <template>

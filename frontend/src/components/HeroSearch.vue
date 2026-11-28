@@ -20,10 +20,8 @@ const emit = defineEmits(['update:modelValue', 'parse'])
         Linkora，
         <span class="bg-gradient-to-r from-brand to-[#3b9bff] bg-clip-text text-transparent">一键保存</span>
       </h1>
-      <p
-        class="mx-auto mt-4 max-w-4xl overflow-x-auto whitespace-nowrap text-base leading-snug text-muted sm:text-lg"
-      >
-        粘贴链接即可解析多清晰度，免费下载到本地。升级 VIP 解锁批量加速与 AI 能力。
+      <p class="mx-auto mt-4 max-w-3xl text-sm leading-snug text-muted sm:text-base">
+        粘贴链接即可解析并免费下载；AI 总结免费 3 次，VIP 无限次。
       </p>
     </div>
 

@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import HeroSearch from './components/HeroSearch.vue'
 import PlatformPills from './components/PlatformPills.vue'
@@ -8,6 +8,14 @@ import GeoContent from './components/GeoContent.vue'
 import FeaturePlaceholders from './components/FeaturePlaceholders.vue'
 import AppFooter from './components/AppFooter.vue'
 import { downloadVideo, parseVideo, saveFile, summarizeVideoStream } from './api/client'
+import { scrollToId } from './utils/scrollToId'
+
+onMounted(() => {
+  const id = window.location.hash.replace(/^#/, '')
+  if (id === 'features' || id === 'download') {
+    requestAnimationFrame(() => scrollToId(id))
+  }
+})
 
 const url = ref('')
 const parsing = ref(false)

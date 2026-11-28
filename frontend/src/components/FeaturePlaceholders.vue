@@ -5,10 +5,10 @@ const tip = ref('')
 
 function onPlanClick(plan) {
   if (plan.id === 'free') {
-    tip.value = '免费版已可用，直接在上方粘贴链接即可下载。'
+    tip.value = '免费版已可用：下载不限次，AI 总结可体验 3 次。'
     return
   }
-  tip.value = `${plan.name}支付尚未接入，权益即将上线，敬请期待。`
+  tip.value = 'VIP 权益展示中，支付能力即将开放，敬请期待。'
 }
 
 const plans = [
@@ -20,12 +20,18 @@ const plans = [
     badge: null,
     highlight: false,
     cta: '当前可用',
-    features: ['单链接解析下载', '常见清晰度选择', '本机临时文件', '基础站点支持'],
+    features: [
+      '单链接解析下载',
+      '常见清晰度选择',
+      'AI 视频总结 3 次',
+      '本机临时文件',
+      '基础站点支持',
+    ],
   },
   {
     id: 'vip',
     name: 'VIP 会员',
-    price: '¥19',
+    price: '¥9.9',
     period: '/月',
     badge: '最受欢迎',
     highlight: true,
@@ -33,61 +39,36 @@ const plans = [
     features: [
       '批量下载加速队列',
       '高清优先处理',
-      'AI 视频总结（本机已可用）',
+      'AI 视频总结无限次',
       '字幕翻译多语言',
       '更大并发额度',
     ],
-  },
-  {
-    id: 'pro',
-    name: '专业版',
-    price: '¥49',
-    period: '/月',
-    badge: '团队',
-    highlight: false,
-    cta: '咨询专业版',
-    features: ['VIP 全部权益', '专属客服通道', '更高并发与配额', '后续企业能力优先'],
-  },
-]
-
-const extras = [
-  {
-    title: 'AI 视频总结',
-    desc: '解析成功后自动总结，同屏查看摘要、章节大纲与知识点，可导出 Markdown。',
-    status: 'available',
-    href: '#result-workspace',
-  },
-  {
-    title: '字幕翻译',
-    desc: '多语言字幕生成与翻译，跨语种无压力。',
-    status: 'soon',
-  },
-  {
-    title: '批量加速',
-    desc: '排队优先、并发提升，多任务一次搞定。',
-    status: 'soon',
   },
 ]
 </script>
 
 <template>
-  <section id="features" class="mx-auto max-w-6xl scroll-mt-28 px-4 pb-12 pt-6 sm:px-6 sm:pb-16 sm:pt-8">
+  <!-- 接近整屏高度，锚点滚到顶后上方 GEO 会完全滚出视口，只剩会员内容 -->
+  <section
+    id="features"
+    class="mx-auto flex min-h-[calc(100dvh-6.5rem)] max-w-6xl flex-col px-4 pb-10 pt-4 sm:px-6 sm:pt-6"
+  >
     <div class="mx-auto max-w-2xl text-center">
       <p class="text-sm font-semibold tracking-wide text-vip">会员特权</p>
       <h2 class="mt-2 text-2xl font-bold text-ink sm:text-3xl">升级 VIP，下载更快更聪明</h2>
       <p class="mt-3 text-muted">
-        免费已够用；想要批量、高清优先和 AI 能力，一键升级。以下为产品占位，支付尚未接入。
+        免费可下载，并赠送 AI 总结 3 次；开通 VIP 可无限次总结，并解锁批量与高清优先等权益。当前为权益展示中。
       </p>
     </div>
 
-    <div class="mt-10 grid gap-4 lg:grid-cols-3">
+    <div class="mx-auto mt-10 grid w-full max-w-3xl gap-4 sm:grid-cols-2">
       <article
         v-for="plan in plans"
         :key="plan.id"
         class="relative flex flex-col rounded-3xl border bg-white p-6 transition duration-200"
         :class="
           plan.highlight
-            ? 'border-vip/40 shadow-[var(--shadow-elev-3)] ring-1 ring-vip/20 lg:-translate-y-1'
+            ? 'border-vip/40 shadow-[var(--shadow-elev-3)] ring-1 ring-vip/20 sm:-translate-y-1'
             : 'border-line shadow-[var(--shadow-elev-1)] hover:shadow-[var(--shadow-elev-2)]'
         "
       >
@@ -133,7 +114,7 @@ const extras = [
           @click="onPlanClick(plan)"
         >
           {{ plan.cta }}
-          <span v-if="plan.id !== 'free'" class="ml-1 text-xs font-normal opacity-80">· 即将上线</span>
+          <span v-if="plan.id !== 'free'" class="ml-1 text-xs font-normal opacity-80">· 权益展示中</span>
         </button>
       </article>
     </div>
@@ -145,28 +126,5 @@ const extras = [
     >
       {{ tip }}
     </p>
-
-    <div class="mt-8 grid gap-3 sm:grid-cols-3">
-      <component
-        :is="item.href ? 'a' : 'div'"
-        v-for="item in extras"
-        :key="item.title"
-        :href="item.href || undefined"
-        class="rounded-2xl border border-line/80 bg-white/80 p-4 shadow-[var(--shadow-elev-1)]"
-        :class="item.href ? 'transition hover:border-brand/40 hover:shadow-[var(--shadow-elev-2)]' : ''"
-      >
-        <h4 class="font-semibold text-ink">{{ item.title }}</h4>
-        <p class="mt-1.5 text-sm leading-relaxed text-muted">{{ item.desc }}</p>
-        <span
-          v-if="item.status === 'available'"
-          class="mt-3 inline-block text-xs font-medium text-brand"
-        >
-          解析后自动总结 · 需配置 LLM API Key
-        </span>
-        <span v-else class="mt-3 inline-block text-xs font-medium text-vip">
-          VIP 专属 · 即将上线
-        </span>
-      </component>
-    </div>
   </section>
 </template>

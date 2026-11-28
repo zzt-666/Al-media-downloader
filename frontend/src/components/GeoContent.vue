@@ -7,7 +7,7 @@ const steps = [
   { title: '粘贴链接', desc: '公开链接或分享文案' },
   { title: '一键解析', desc: '封面、时长、清晰度' },
   { title: '免费下载', desc: '选格式，存到本机' },
-  { title: 'VIP 总结', desc: '摘要、章节可导出' },
+  { title: 'AI 总结', desc: '免费 3 次，VIP 无限' },
 ]
 
 const scenes = [
@@ -23,7 +23,7 @@ const faqs = [
   },
   {
     q: 'Linkora 收费吗？下载和 AI 总结有什么区别？',
-    a: '视频解析与下载免费可用，无需开通会员。AI 视频总结（摘要、章节、知识点等）需要开通 VIP 会员后使用。',
+    a: '视频解析与下载免费可用。普通用户可体验 AI 视频总结 3 次；开通 VIP 会员后可无限次使用摘要、章节与知识点等能力。',
   },
   {
     q: '下载的内容可以商用或传播吗？',
@@ -41,14 +41,12 @@ function toggleFaq(index) {
     <!-- Intro -->
     <div class="mx-auto max-w-4xl">
       <h2 class="text-xl font-bold tracking-tight text-ink sm:text-2xl">Linkora 是什么</h2>
-      <p
-        class="mt-1.5 overflow-x-auto whitespace-nowrap text-base leading-snug text-muted sm:text-lg"
-      >
-        面向学习与个人备份：粘贴公开链接即可解析并免费下载；开通 VIP 后可生成要点摘要与章节结构。
+      <p class="mt-1.5 text-sm leading-snug text-muted sm:text-base">
+        面向学习与个人备份：粘贴链接即可免费下载；AI 总结免费 3 次，VIP 无限次。
       </p>
       <div class="mt-2 flex flex-wrap justify-center gap-2">
         <span class="rounded-md bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand">下载免费</span>
-        <span class="rounded-md bg-vip-soft px-2.5 py-1 text-xs font-medium text-vip-deep">总结需 VIP</span>
+        <span class="rounded-md bg-vip-soft px-2.5 py-1 text-xs font-medium text-vip-deep">总结 3 次 / VIP 无限</span>
         <span class="rounded-md bg-page px-2.5 py-1 text-xs font-medium text-muted">学习向 · 尊重版权</span>
       </div>
     </div>
@@ -87,7 +85,7 @@ function toggleFaq(index) {
       </ul>
     </div>
 
-    <!-- FAQ + boundary -->
+    <!-- FAQ -->
     <div class="mx-auto mt-9 max-w-4xl border-t border-line/70 pt-8">
       <h2 class="text-xl font-bold tracking-tight text-ink sm:text-2xl">常见问题</h2>
       <div class="mt-4 divide-y divide-line/70 text-left">
@@ -118,21 +116,6 @@ function toggleFaq(index) {
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="mt-5 border-t border-line/70 pt-4">
-        <h2 class="text-base font-bold text-ink sm:text-lg">使用说明与边界</h2>
-        <p
-          class="mt-1 overflow-x-auto whitespace-nowrap text-sm leading-snug text-muted sm:text-base"
-        >
-          请仅处理你有权保存的公开内容。公网部署可能面临限流与合规风险；当前按本机学习场景设计。详细声明见页脚。
-        </p>
-        <a
-          href="#features"
-          class="mt-1.5 inline-flex text-sm font-semibold text-vip-deep underline-offset-2 hover:underline"
-        >
-          查看 VIP 方案
-        </a>
       </div>
     </div>
   </section>
