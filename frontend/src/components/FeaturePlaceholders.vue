@@ -71,7 +71,7 @@ const extras = [
 </script>
 
 <template>
-  <section id="features" class="mx-auto max-w-6xl scroll-mt-28 px-4 py-12 sm:px-6 sm:py-16">
+  <section id="features" class="mx-auto max-w-6xl scroll-mt-28 px-4 pb-12 pt-6 sm:px-6 sm:pb-16 sm:pt-8">
     <div class="mx-auto max-w-2xl text-center">
       <p class="text-sm font-semibold tracking-wide text-vip">会员特权</p>
       <h2 class="mt-2 text-2xl font-bold text-ink sm:text-3xl">升级 VIP，下载更快更聪明</h2>

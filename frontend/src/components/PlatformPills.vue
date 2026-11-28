@@ -12,7 +12,7 @@ const platforms = [
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
+  <section class="mx-auto max-w-6xl px-4 pb-3 sm:px-6">
     <div
       class="rounded-2xl border border-line/80 bg-white/70 px-4 py-5 text-center shadow-[var(--shadow-elev-1)] backdrop-blur-sm sm:px-6"
     >

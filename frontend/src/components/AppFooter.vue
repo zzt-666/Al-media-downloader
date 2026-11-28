@@ -29,7 +29,7 @@
         </div>
       </div>
       <p class="mt-8 text-xs text-muted/80">
-        © {{ new Date().getFullYear() }} 万能视频下载器 · 基于 yt-dlp
+        © {{ new Date().getFullYear() }} Linkora · 基于 yt-dlp
       </p>
     </div>
   </footer>

@@ -9,9 +9,9 @@
           class="grid h-9 w-9 place-items-center rounded-xl bg-brand text-sm font-bold text-white shadow-[var(--shadow-elev-1)]"
           aria-hidden="true"
         >
-          V
+          L
         </span>
-        <span class="text-base font-bold tracking-tight sm:text-lg">万能视频下载器</span>
+        <span class="text-base font-bold tracking-tight sm:text-lg">Linkora</span>
       </a>
       <nav class="flex items-center gap-1 sm:gap-2">
         <a

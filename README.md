@@ -1,6 +1,6 @@
-# 万能视频下载器（AI-media-downloader）
+# Linkora（AI-media-downloader）
 
-学习向 Web 工具：粘贴链接 → 解析 → 选择清晰度与格式 → 下载到本地。  
+学习向 Web 工具：粘贴链接 → 解析 → 选择清晰度与格式 → 下载到本地；可选 AI 视频总结。  
 解析与下载委托 [yt-dlp](https://github.com/yt-dlp/yt-dlp)，本仓库只做薄封装（FastAPI + Vue）。
 
 > **声明**：仅供学习与个人备份。请尊重版权，禁止将未授权内容用于商用或传播。勿尝试绕过 DRM / 破解会员。
@@ -59,6 +59,22 @@ npm run dev
 
 浏览器打开 Vite 提示的地址（默认 <http://127.0.0.1:5173>）。  
 开发服务器将 `/api` **原样代理**到 `http://127.0.0.1:8000`（不剥离 `/api` 前缀）。
+
+### 前端 SEO / 公网域名（`frontend/.env`）
+
+首页 TDK、Open Graph、`canonical`、`robots.txt`、`sitemap.xml` 会读取站点根地址。默认占位为 `https://example.com`。
+
+1. 复制 [frontend/.env.example](frontend/.env.example) 为 `frontend/.env`（或直接改 `frontend/.env.production`）
+2. 设置正式域名（**不要**末尾斜杠），例如：
+
+```bash
+VITE_SITE_URL=https://你的域名.com
+VITE_SITE_NAME=Linkora
+```
+
+3. 重新执行 `npm run build`（开发模式改 `.env` 后重启 `npm run dev`）
+
+构建产物中的 `canonical` / `og:url` / `og:image`、以及 `dist/robots.txt`、`dist/sitemap.xml` 与 `dist/llms.txt` 都会使用该地址。有域名后只需改环境变量，不必改业务代码。
 
 ## 使用流程
 

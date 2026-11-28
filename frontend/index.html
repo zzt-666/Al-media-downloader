@@ -1,19 +1,163 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
+    <!-- ========== 基础必需标签 ========== -->
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- ========== 核心 SEO 标签 ========== -->
+    <title>在线视频下载与AI总结 - Linkora | 粘贴链接一键保存</title>
+    <meta
+      name="description"
+      content="Linkora 是面向学习与个人备份的在线视频下载与AI总结工具。粘贴视频链接即可解析多清晰度并免费下载到本地；开通VIP后可生成要点摘要与章节结构。支持常见视频平台，立即使用。"
+    />
+    <meta
+      name="keywords"
+      content="在线视频下载,视频下载,AI视频总结,视频摘要,粘贴链接下载,多清晰度下载,视频章节摘要,学习备份,Linkora,免费视频下载"
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="%VITE_SITE_URL%/" />
+
+    <!-- ========== Open Graph 标签 ========== -->
+    <meta property="og:title" content="在线视频下载与AI总结 - Linkora" />
+    <meta
+      property="og:description"
+      content="粘贴链接即可免费解析多清晰度并下载；开通VIP解锁AI要点与章节摘要。学习向工具，立即体验。"
+    />
+    <meta property="og:image" content="%VITE_SITE_URL%/og-share.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content="Linkora" />
+
+    <!-- ========== Twitter Card ========== -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="在线视频下载与AI总结 - Linkora" />
+    <meta
+      name="twitter:description"
+      content="粘贴链接即可免费解析多清晰度并下载；开通VIP解锁AI要点与章节摘要。学习向工具，立即体验。"
+    />
+    <meta name="twitter:image" content="%VITE_SITE_URL%/og-share.png" />
+
+    <!-- ========== Schema.org itemprop ========== -->
+    <meta itemprop="name" content="Linkora" />
+    <meta
+      itemprop="description"
+      content="面向学习与个人备份的在线视频下载与AI总结工具。"
+    />
+    <meta itemprop="image" content="%VITE_SITE_URL%/og-share.png" />
+
+    <!-- ========== JSON-LD 结构化数据 ========== -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "name": "Linkora",
+            "url": "%VITE_SITE_URL%/",
+            "applicationCategory": "MultimediaApplication",
+            "operatingSystem": "Web",
+            "description": "面向学习与个人备份的在线视频下载与AI总结工具。粘贴公开视频链接可免费解析多清晰度并下载到本地；开通VIP后可生成要点摘要与章节结构。",
+            "featureList": [
+              "公开视频链接解析与多清晰度下载",
+              "免费下载到本地",
+              "VIP解锁AI视频总结、章节大纲与知识点",
+              "总结导出Markdown与思维导图"
+            ],
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "CNY",
+              "description": "视频解析与下载免费；AI总结需开通VIP"
+            },
+            "inLanguage": "zh-CN"
+          },
+          {
+            "@type": "Organization",
+            "name": "Linkora",
+            "url": "%VITE_SITE_URL%/",
+            "logo": "%VITE_SITE_URL%/og-share.png"
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Linkora 支持哪些视频网站？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "凡本机已安装的 yt-dlp 引擎能够解析的公开页面，均可尝试；实际可用性因站点策略变化而异，以解析结果为准。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Linkora 收费吗？下载和 AI 总结有什么区别？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "视频解析与下载免费可用，无需开通会员。AI 视频总结（摘要、章节、知识点等）需要开通 VIP 会员后使用。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "下载的内容可以商用或传播吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不可以。Linkora 仅供学习与个人备份辅助，请尊重版权，禁止将未授权内容用于商用或传播，也请勿尝试绕过 DRM 或破解会员。"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans+SC:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <title>万能视频下载器</title>
   </head>
   <body>
     <div id="app"></div>
+    <noscript>
+      <main>
+        <h1>Linkora，一键保存</h1>
+        <p>
+          Linkora 是面向学习与个人备份的在线视频工具：粘贴公开视频链接后，可解析多清晰度并免费下载到本地；开通
+          VIP 后还可生成要点摘要与章节结构。
+        </p>
+        <h2>如何用 Linkora 下载并总结视频</h2>
+        <ol>
+          <li>粘贴链接：将公开视频链接（或含链接的分享文案）粘贴到页面顶部输入框。</li>
+          <li>一键解析：查看标题、封面、时长与可选清晰度 / 格式。</li>
+          <li>免费下载到本地：选择合适选项后即可下载，无需付费。</li>
+          <li>VIP 解锁 AI 总结：开通 VIP 后，可生成要点摘要、章节大纲与知识点，并支持导出 Markdown 或思维导图。</li>
+        </ol>
+        <h2>适合哪些使用场景</h2>
+        <ul>
+          <li>课程与讲座回顾：下载后本地保存，并用摘要快速抓住重点。</li>
+          <li>学习资料备份：将公开教学视频存到本机，离线复习。</li>
+          <li>内容要点摘录：先看章节与知识点，再决定是否完整观看。</li>
+        </ul>
+        <h2>常见问题</h2>
+        <h3>Linkora 支持哪些视频网站？</h3>
+        <p>凡本机已安装的 yt-dlp 引擎能够解析的公开页面，均可尝试；实际可用性因站点策略变化而异，以解析结果为准。</p>
+        <h3>Linkora 收费吗？下载和 AI 总结有什么区别？</h3>
+        <p>视频解析与下载免费可用，无需开通会员。AI 视频总结（摘要、章节、知识点等）需要开通 VIP 会员后使用。</p>
+        <h3>下载的内容可以商用或传播吗？</h3>
+        <p>不可以。Linkora 仅供学习与个人备份辅助，请尊重版权，禁止将未授权内容用于商用或传播，也请勿尝试绕过 DRM 或破解会员。</p>
+        <h2>使用说明与边界</h2>
+        <p>请仅处理你有权保存的公开内容。公网部署可能面临限流与合规风险；当前产品按本机学习场景设计。</p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
+

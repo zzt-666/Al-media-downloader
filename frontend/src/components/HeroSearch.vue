@@ -17,10 +17,12 @@ const emit = defineEmits(['update:modelValue', 'parse'])
         更快 · 更清晰 · 千站可用
       </p>
       <h1 class="text-3xl font-bold leading-tight tracking-tight text-ink sm:text-5xl sm:leading-[1.15]">
-        万能视频下载器，
+        Linkora，
         <span class="bg-gradient-to-r from-brand to-[#3b9bff] bg-clip-text text-transparent">一键保存</span>
       </h1>
-      <p class="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
+      <p
+        class="mx-auto mt-4 max-w-4xl overflow-x-auto whitespace-nowrap text-base leading-snug text-muted sm:text-lg"
+      >
         粘贴链接即可解析多清晰度，免费下载到本地。升级 VIP 解锁批量加速与 AI 能力。
       </p>
     </div>

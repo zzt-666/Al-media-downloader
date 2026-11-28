@@ -4,6 +4,7 @@ import AppHeader from './components/AppHeader.vue'
 import HeroSearch from './components/HeroSearch.vue'
 import PlatformPills from './components/PlatformPills.vue'
 import ResultWorkspace from './components/ResultWorkspace.vue'
+import GeoContent from './components/GeoContent.vue'
 import FeaturePlaceholders from './components/FeaturePlaceholders.vue'
 import AppFooter from './components/AppFooter.vue'
 import { downloadVideo, parseVideo, saveFile, summarizeVideoStream } from './api/client'
@@ -258,6 +259,7 @@ async function onSummarize(opts = {}) {
         @summarize="onSummarize"
       />
 
+      <GeoContent />
       <FeaturePlaceholders />
     </main>
     <AppFooter />

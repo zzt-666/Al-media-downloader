@@ -23,7 +23,7 @@ async def lifespan(_app: FastAPI):
     registry.cleanup_expired()
 
 
-app = FastAPI(title="万能视频下载器", lifespan=lifespan)
+app = FastAPI(title="Linkora", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
